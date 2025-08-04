@@ -333,7 +333,7 @@ if __name__ == "__main__":
             
             # Action buttons
             with gr.Row():
-                submit_btn = gr.Button("💬 Send Message", variant="primary")
+                chat_submit_btn = gr.Button("💬 Send Message", variant="primary")
                 clear_btn = gr.Button("🗑️ Clear Chat", variant="secondary")
             
             # Audio output
@@ -426,7 +426,7 @@ if __name__ == "__main__":
             return [], None
 
         # Connect event handlers
-        submit_btn.click(
+        chat_submit_btn.click(
             fn=respond,
             inputs=[msg, chatbot, voice_toggle, voice_type],
             outputs=[chatbot, audio_output]
