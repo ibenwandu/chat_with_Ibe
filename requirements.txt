@@ -4,3 +4,5 @@ pypdf
 openai
 gdown
 gradio>=4.25.0
+pydub
+ffmpeg-python

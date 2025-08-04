@@ -32,7 +32,60 @@ try:
 except ImportError as e:
     print(f"✗ Failed to import python-dotenv: {e}")
 
+try:
+    import requests
+    print("✓ requests imported successfully")
+except ImportError as e:
+    print(f"✗ Failed to import requests: {e}")
+
+try:
+    import base64
+    import io
+    from pydub import AudioSegment
+    from pydub.playback import play
+    print("✓ pydub imported successfully")
+except ImportError as e:
+    print(f"✗ Failed to import pydub: {e}")
+
 load_dotenv(override=True)
+
+
+def text_to_speech(text, voice="alloy"):
+    """Convert text to speech using OpenAI's TTS API"""
+    try:
+        client = OpenAI()
+        response = client.audio.speech.create(
+            model="tts-1",
+            voice=voice,
+            input=text
+        )
+        
+        # Save the audio to a temporary file
+        audio_path = "temp_speech.mp3"
+        response.stream_to_file(audio_path)
+        return audio_path
+    except Exception as e:
+        print(f"Error in text-to-speech: {e}")
+        return None
+
+
+# Global variable to track current voice type
+current_voice_type = "alloy"
+
+
+def speech_to_text(audio_file):
+    """Convert speech to text using OpenAI's Whisper API"""
+    try:
+        client = OpenAI()
+        with open(audio_file, "rb") as audio:
+            transcript = client.audio.transcriptions.create(
+                model="whisper-1",
+                file=audio
+            )
+        return transcript.text
+    except Exception as e:
+        print(f"Error in speech-to-text: {e}")
+        return None
 
 
 def push(text):
@@ -96,31 +149,50 @@ class Me:
         self.openai = OpenAI()
         self.name = "Ibe Nwandu"
 
+        # Initialize with default values
+        self.linkedin = ""
+        self.summary = ""
+
         # Download linkedin.pdf using gdown
         linkedin_pdf_url = os.getenv("LINKEDIN_PDF_URL")
         linkedin_pdf_path = "linkedin.pdf"
-        print(f"Downloading LinkedIn PDF from {linkedin_pdf_url}")
-        gdown.download(linkedin_pdf_url, linkedin_pdf_path, quiet=False)
+        
+        if linkedin_pdf_url:
+            print(f"Downloading LinkedIn PDF from {linkedin_pdf_url}")
+            try:
+                gdown.download(linkedin_pdf_url, linkedin_pdf_path, quiet=False)
+                
+                with open(linkedin_pdf_path, "rb") as f:
+                    header = f.read(5)
+                print(f"PDF header bytes: {header}")
 
-        with open(linkedin_pdf_path, "rb") as f:
-            header = f.read(5)
-        print(f"PDF header bytes: {header}")
-
-        reader = PdfReader(linkedin_pdf_path)
-        self.linkedin = ""
-        for page in reader.pages:
-            text = page.extract_text()
-            if text:
-                self.linkedin += text
+                reader = PdfReader(linkedin_pdf_path)
+                for page in reader.pages:
+                    text = page.extract_text()
+                    if text:
+                        self.linkedin += text
+                print("LinkedIn PDF processed successfully")
+            except Exception as e:
+                print(f"Error downloading/processing LinkedIn PDF: {e}")
+        else:
+            print("LINKEDIN_PDF_URL not set, skipping LinkedIn PDF download")
 
         # Download summary.txt using gdown
         summary_txt_url = os.getenv("SUMMARY_TXT_URL")
         summary_txt_path = "summary.txt"
-        print(f"Downloading summary text from {summary_txt_url}")
-        gdown.download(summary_txt_url, summary_txt_path, quiet=False)
-
-        with open(summary_txt_path, "r", encoding="utf-8") as f:
-            self.summary = f.read()
+        
+        if summary_txt_url:
+            print(f"Downloading summary text from {summary_txt_url}")
+            try:
+                gdown.download(summary_txt_url, summary_txt_path, quiet=False)
+                
+                with open(summary_txt_path, "r", encoding="utf-8") as f:
+                    self.summary = f.read()
+                print("Summary text processed successfully")
+            except Exception as e:
+                print(f"Error downloading/processing summary text: {e}")
+        else:
+            print("SUMMARY_TXT_URL not set, skipping summary text download")
 
     def handle_tool_call(self, tool_calls):
         results = []
@@ -161,6 +233,20 @@ class Me:
             else:
                 done = True
         return response.choices[0].message.content
+
+    def chat_with_voice(self, message, history, voice_enabled=True):
+        """Chat with optional text-to-speech for responses"""
+        response = self.chat(message, history)
+        
+        if voice_enabled and response:
+            # Generate speech for the response using current voice type
+            audio_path = text_to_speech(response, current_voice_type)
+            if audio_path:
+                return response, audio_path
+            else:
+                return response, None
+        else:
+            return response, None
 
 
 if __name__ == "__main__":
@@ -206,11 +292,55 @@ if __name__ == "__main__":
 
         # Container for chatbot that starts hidden
         with gr.Column(visible=False) as chatbot_section:
-            chatbot_interface = gr.ChatInterface(
-                fn=me.chat,
-                type="messages",
-                title="Chat with Ibe Nwandu",
-                description="Ask me about my background, experience, and skills"
+            gr.Markdown("## 🎤 Voice Chat with Ibe Nwandu")
+            gr.Markdown("Ask me about my background, experience, and skills")
+            
+            # Voice controls
+            with gr.Row():
+                voice_toggle = gr.Checkbox(
+                    label="🔊 Enable Voice Responses", 
+                    value=True,
+                    info="Toggle text-to-speech for responses"
+                )
+                voice_type = gr.Dropdown(
+                    choices=["alloy", "echo", "fable", "onyx", "nova", "shimmer"],
+                    value="alloy",
+                    label="🎭 Voice Type",
+                    info="Choose the voice for responses"
+                )
+            
+            # Chat interface with voice
+            chatbot = gr.Chatbot(
+                label="Chat History",
+                height=400,
+                show_label=True
+            )
+            
+            # Input section
+            with gr.Row():
+                with gr.Column(scale=4):
+                    msg = gr.Textbox(
+                        label="Type your message",
+                        placeholder="Type here or use voice input...",
+                        lines=2
+                    )
+                with gr.Column(scale=1):
+                    voice_input = gr.Audio(
+                        sources=["microphone"],
+                        type="filepath",
+                        label="🎤 Voice Input"
+                    )
+            
+            # Action buttons
+            with gr.Row():
+                submit_btn = gr.Button("💬 Send Message", variant="primary")
+                clear_btn = gr.Button("🗑️ Clear Chat", variant="secondary")
+            
+            # Audio output
+            audio_output = gr.Audio(
+                label="🔊 Response Audio",
+                visible=True,
+                interactive=False
             )
 
         # Footer
@@ -256,6 +386,61 @@ if __name__ == "__main__":
             fn=toggle_password_visibility,
             inputs=password_visible,
             outputs=[password_box, show_password_btn, password_visible]
+        )
+
+        # Voice chat event handlers
+        def respond(message, history, voice_enabled, voice_type):
+            if not message.strip():
+                return history, None
+            
+            # Update voice type for TTS
+            global current_voice_type
+            current_voice_type = voice_type
+            
+            # Get response with voice
+            response, audio_path = me.chat_with_voice(message, history, voice_enabled)
+            
+            # Update history
+            history.append((message, response))
+            
+            return history, audio_path
+
+        def respond_to_voice(audio_file, history, voice_enabled, voice_type):
+            if not audio_file:
+                return history, None, ""
+            
+            # Convert speech to text
+            transcribed_text = speech_to_text(audio_file)
+            if not transcribed_text:
+                return history, None, "Could not transcribe audio. Please try again."
+            
+            # Get response
+            response, audio_path = me.chat_with_voice(transcribed_text, history, voice_enabled)
+            
+            # Update history
+            history.append((transcribed_text, response))
+            
+            return history, audio_path, ""
+
+        def clear_chat():
+            return [], None
+
+        # Connect event handlers
+        submit_btn.click(
+            fn=respond,
+            inputs=[msg, chatbot, voice_toggle, voice_type],
+            outputs=[chatbot, audio_output]
+        )
+        
+        voice_input.change(
+            fn=respond_to_voice,
+            inputs=[voice_input, chatbot, voice_toggle, voice_type],
+            outputs=[chatbot, audio_output, msg]
+        )
+        
+        clear_btn.click(
+            fn=clear_chat,
+            outputs=[chatbot, audio_output]
         )
 
     # Launch app
