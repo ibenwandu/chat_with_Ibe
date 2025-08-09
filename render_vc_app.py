@@ -487,8 +487,10 @@ if __name__ == "__main__":
         )
 
     # Launch app
+    # Use 0.0.0.0 for Render deployment, 127.0.0.1 for local development
+    server_name = "0.0.0.0" if os.environ.get("RENDER") else "127.0.0.1"
     demo.launch(
-        server_name="127.0.0.1",  # Use 127.0.0.1 for local development
+        server_name=server_name,
         server_port=port,
         share=False,
         show_error=True,
