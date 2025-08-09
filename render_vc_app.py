@@ -48,15 +48,35 @@ def speech_to_text(audio_file):
 
 # Tools
 def push(text):
+    """Send push notification via Pushover"""
     import requests
-    requests.post(
-        "https://api.pushover.net/1/messages.json",
-        data={
-            "token": os.getenv("PUSHOVER_TOKEN"),
-            "user": os.getenv("PUSHOVER_USER"),
-            "message": text,
-        }
-    )
+    
+    token = os.getenv("PUSHOVER_TOKEN")
+    user = os.getenv("PUSHOVER_USER")
+    
+    if not token or not user:
+        print(f"⚠️ Push notification skipped - Missing environment variables:")
+        print(f"   PUSHOVER_TOKEN: {'✓ Set' if token else '✗ Missing'}")
+        print(f"   PUSHOVER_USER: {'✓ Set' if user else '✗ Missing'}")
+        return
+    
+    try:
+        response = requests.post(
+            "https://api.pushover.net/1/messages.json",
+            data={
+                "token": token,
+                "user": user,
+                "message": text,
+            }
+        )
+        
+        if response.status_code == 200:
+            print(f"✅ Push notification sent successfully: {text[:50]}...")
+        else:
+            print(f"❌ Push notification failed (Status {response.status_code}): {response.text}")
+            
+    except Exception as e:
+        print(f"❌ Push notification error: {e}")
 
 def record_user_details(email, name="Name not provided", notes="not provided"):
     push(f"Recording {name} with email {email} and notes {notes}")
@@ -141,15 +161,8 @@ class Me:
         return (
             f"You are acting as {self.name} on {today_str}. "
             f"Answer questions about your career, background, skills, and experience professionally. "
-        system_prompt += "If unsure, record the question. Encourage the user to provide their email for follow-up. "
-
-"
-            f"## Summary:
-{self.summary}
-
-## LinkedIn Profile:
-{self.linkedin}
-"
+            f"If unsure, record the question. Encourage the user to provide their email for follow-up. "
+            f"## Summary:\n{self.summary}\n\n## LinkedIn Profile:\n{self.linkedin}\n"
         )
 
     def chat(self, message, history):
