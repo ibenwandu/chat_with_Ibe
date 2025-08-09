@@ -141,7 +141,7 @@ class Me:
         return (
             f"You are acting as {self.name} on {today_str}. "
             f"Answer questions about your career, background, skills, and experience professionally. "
-            f"If unsure, record the question. Encourage the user to provide their email for follow-up.
+        system_prompt += "If unsure, record the question. Encourage the user to provide their email for follow-up. "
 
 "
             f"## Summary:
