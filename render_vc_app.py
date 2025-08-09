@@ -1,6 +1,8 @@
+
 import os
 import json
-print("✓ os and json imported successfully")
+import datetime
+print("✓ os, json, and datetime imported successfully")
 
 try:
     import gdown
@@ -67,6 +69,21 @@ def text_to_speech(text, voice="alloy"):
     except Exception as e:
         print(f"Error in text-to-speech: {e}")
         return None
+
+
+def custom_voice_tts(text):
+    """Placeholder function for custom voice TTS - ready for your own model/TTS file"""
+    # TODO: Implement custom voice TTS when you have your own recorded voice model
+    # This could be:
+    # 1. A path to your own TTS model
+    # 2. An API call to a custom voice service
+    # 3. A recorded voice file that gets processed
+    
+    print(f"Custom voice TTS called with text: {text[:50]}...")
+    print("Note: Custom voice not yet implemented. Using default 'alloy' voice.")
+    
+    # For now, fallback to default voice
+    return text_to_speech(text, "alloy")
 
 
 # Global variable to track current voice type
@@ -144,6 +161,12 @@ tools = [
 ]
 
 
+def get_current_date():
+    """Get current date formatted as 'Saturday, August 9, 2025'"""
+    now = datetime.datetime.now()
+    return now.strftime("%A, %B %d, %Y")
+
+
 class Me:
     def __init__(self):
         self.openai = OpenAI()
@@ -206,12 +229,15 @@ class Me:
         return results
 
     def system_prompt(self):
+        current_date = get_current_date()
         system_prompt = (
-            f"You are acting as {self.name}. You are answering questions on {self.name}'s website, "
+            f"You are acting as {self.name}. Today is {current_date}. "
+            f"You are answering questions on {self.name}'s website, "
             f"particularly questions related to {self.name}'s career, background, skills and experience. "
             f"Your responsibility is to represent {self.name} for interactions on the website as faithfully as possible. "
             f"You are given a summary of {self.name}'s background and LinkedIn profile which you can use to answer questions. "
             f"Be professional and engaging, as if talking to a potential client or future employer who came across the website. "
+            f"You can reference the current date ({current_date}) naturally in conversation when relevant. "
             f"If you don't know the answer to any question, use your record_unknown_question tool to record the question that you couldn't answer, even if it's about something trivial or unrelated to career. "
             f"If the user is engaging in discussion, try to steer them towards getting in touch via email; ask for their email and record it using your record_user_details tool. "
         )
@@ -240,7 +266,11 @@ class Me:
         
         if voice_enabled and response:
             # Generate speech for the response using current voice type
-            audio_path = text_to_speech(response, current_voice_type)
+            if current_voice_type == "custom":
+                audio_path = custom_voice_tts(response)
+            else:
+                audio_path = text_to_speech(response, current_voice_type)
+            
             if audio_path:
                 return response, audio_path
             else:
@@ -270,7 +300,6 @@ if __name__ == "__main__":
             </style>
             """)
 
-
         # Password section - always visible initially
         with gr.Column(visible=True) as password_section:
             gr.Markdown("# Welcome")
@@ -292,10 +321,13 @@ if __name__ == "__main__":
 
         # Container for chatbot that starts hidden
         with gr.Column(visible=False) as chatbot_section:
-            gr.Markdown("## 🎤 Voice Chat with Ibe Nwandu")
-            gr.Markdown("Ask me about my background, experience, and skills")
+            # Dynamic greeting with today's date
+            current_date = get_current_date()
+            gr.Markdown(f"## 🎤 Voice Chat with Ibe Nwandu")
+            gr.Markdown(f"**Today is {current_date}**")
+            gr.Markdown("Ask me about my background, experience, and skills. You can type your message or use voice input.")
             
-            # Voice controls
+            # Voice controls in a cleaner layout
             with gr.Row():
                 voice_toggle = gr.Checkbox(
                     label="🔊 Enable Voice Responses", 
@@ -303,38 +335,38 @@ if __name__ == "__main__":
                     info="Toggle text-to-speech for responses"
                 )
                 voice_type = gr.Dropdown(
-                    choices=["alloy", "echo", "fable", "onyx", "nova", "shimmer"],
+                    choices=["alloy", "echo", "fable", "onyx", "nova", "shimmer", "custom"],
                     value="alloy",
                     label="🎭 Voice Type",
-                    info="Choose the voice for responses"
+                    info="Choose the voice for responses (Custom = your own voice model)"
                 )
             
-            # Chat interface with voice
+            # Chat interface with cleaner layout
             chatbot = gr.Chatbot(
                 label="Chat History",
-                height=400,
+                height=350,
                 show_label=True
             )
             
-            # Input section
+            # Combined input section - text and voice side by side
             with gr.Row():
-                with gr.Column(scale=4):
-                    msg = gr.Textbox(
-                        label="Type your message",
-                        placeholder="Type here or use voice input...",
-                        lines=2
-                    )
-                with gr.Column(scale=1):
-                    voice_input = gr.Audio(
-                        sources=["microphone"],
-                        type="filepath",
-                        label="🎤 Voice Input"
-                    )
+                msg = gr.Textbox(
+                    label="💬 Type your message",
+                    placeholder="Type here or use voice input...",
+                    lines=2,
+                    scale=3
+                )
+                voice_input = gr.Audio(
+                    sources=["microphone"],
+                    type="filepath",
+                    label="🎤 Voice Input",
+                    scale=1
+                )
             
-            # Action buttons
+            # Action buttons in cleaner layout
             with gr.Row():
-                chat_submit_btn = gr.Button("💬 Send Message", variant="primary")
-                clear_btn = gr.Button("🗑️ Clear Chat", variant="secondary")
+                chat_submit_btn = gr.Button("💬 Send Message", variant="primary", scale=2)
+                clear_btn = gr.Button("🗑️ Clear Chat", variant="secondary", scale=1)
             
             # Audio output
             audio_output = gr.Audio(
@@ -391,7 +423,7 @@ if __name__ == "__main__":
         # Voice chat event handlers
         def respond(message, history, voice_enabled, voice_type):
             if not message.strip():
-                return history, None
+                return history, None, ""
             
             # Update voice type for TTS
             global current_voice_type
@@ -403,7 +435,7 @@ if __name__ == "__main__":
             # Update history
             history.append((message, response))
             
-            return history, audio_path
+            return history, audio_path, ""  # Clear message box
 
         def respond_to_voice(audio_file, history, voice_enabled, voice_type):
             if not audio_file:
@@ -413,6 +445,10 @@ if __name__ == "__main__":
             transcribed_text = speech_to_text(audio_file)
             if not transcribed_text:
                 return history, None, "Could not transcribe audio. Please try again."
+            
+            # Update voice type for TTS
+            global current_voice_type
+            current_voice_type = voice_type
             
             # Get response
             response, audio_path = me.chat_with_voice(transcribed_text, history, voice_enabled)
@@ -429,7 +465,14 @@ if __name__ == "__main__":
         chat_submit_btn.click(
             fn=respond,
             inputs=[msg, chatbot, voice_toggle, voice_type],
-            outputs=[chatbot, audio_output]
+            outputs=[chatbot, audio_output, msg]
+        )
+        
+        # Handle Enter key press in text input
+        msg.submit(
+            fn=respond,
+            inputs=[msg, chatbot, voice_toggle, voice_type],
+            outputs=[chatbot, audio_output, msg]
         )
         
         voice_input.change(
@@ -445,7 +488,7 @@ if __name__ == "__main__":
 
     # Launch app
     demo.launch(
-        server_name="0.0.0.0",  # Use 0.0.0.0 for Render deployment
+        server_name="127.0.0.1",  # Use 127.0.0.1 for local development
         server_port=port,
         share=False,
         show_error=True,
