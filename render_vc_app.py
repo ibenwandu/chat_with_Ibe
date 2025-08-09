@@ -246,7 +246,17 @@ class Me:
         return system_prompt
 
     def chat(self, message, history):
-        messages = [{"role": "system", "content": self.system_prompt()}] + history + [{"role": "user", "content": message}]
+        # Convert Gradio history format to OpenAI messages format
+        messages = [{"role": "system", "content": self.system_prompt()}]
+        
+        # Convert history from Gradio tuples to OpenAI message format
+        for user_msg, assistant_msg in history:
+            messages.append({"role": "user", "content": user_msg})
+            messages.append({"role": "assistant", "content": assistant_msg})
+        
+        # Add current user message
+        messages.append({"role": "user", "content": message})
+        
         done = False
         while not done:
             response = self.openai.chat.completions.create(model="gpt-4o-mini", messages=messages, tools=tools)
@@ -345,7 +355,8 @@ if __name__ == "__main__":
             chatbot = gr.Chatbot(
                 label="Chat History",
                 height=350,
-                show_label=True
+                show_label=True,
+                type="messages"
             )
             
             # Combined input section - text and voice side by side
@@ -429,11 +440,21 @@ if __name__ == "__main__":
             global current_voice_type
             current_voice_type = voice_type
             
-            # Get response with voice
-            response, audio_path = me.chat_with_voice(message, history, voice_enabled)
+            # Convert history from Gradio messages format to tuples for our chat function
+            history_tuples = []
+            if history:
+                for i in range(0, len(history), 2):
+                    if i + 1 < len(history):
+                        user_msg = history[i].get("content", "")
+                        assistant_msg = history[i + 1].get("content", "")
+                        history_tuples.append((user_msg, assistant_msg))
             
-            # Update history
-            history.append((message, response))
+            # Get response with voice
+            response, audio_path = me.chat_with_voice(message, history_tuples, voice_enabled)
+            
+            # Update history in Gradio messages format
+            history.append({"role": "user", "content": message})
+            history.append({"role": "assistant", "content": response})
             
             return history, audio_path, ""  # Clear message box
 
@@ -450,11 +471,21 @@ if __name__ == "__main__":
             global current_voice_type
             current_voice_type = voice_type
             
-            # Get response
-            response, audio_path = me.chat_with_voice(transcribed_text, history, voice_enabled)
+            # Convert history from Gradio messages format to tuples for our chat function
+            history_tuples = []
+            if history:
+                for i in range(0, len(history), 2):
+                    if i + 1 < len(history):
+                        user_msg = history[i].get("content", "")
+                        assistant_msg = history[i + 1].get("content", "")
+                        history_tuples.append((user_msg, assistant_msg))
             
-            # Update history
-            history.append((transcribed_text, response))
+            # Get response
+            response, audio_path = me.chat_with_voice(transcribed_text, history_tuples, voice_enabled)
+            
+            # Update history in Gradio messages format
+            history.append({"role": "user", "content": transcribed_text})
+            history.append({"role": "assistant", "content": response})
             
             return history, audio_path, ""
 
