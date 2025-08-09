@@ -1,4 +1,3 @@
-
 import os
 import json
 import datetime
@@ -290,21 +289,18 @@ class Me:
                 done = True
         return response.choices[0].message.content
 
-    def chat_with_voice(self, message, history, voice_enabled=True):
-        """Chat with optional text-to-speech for responses"""
+    def chat_with_voice(self, message, history):
+        """Chat with automatic text-to-speech for responses"""
         response = self.chat(message, history)
         
-        if voice_enabled and response:
+        if response:
             # Generate speech for the response using current voice type
             if current_voice_type == "custom":
                 audio_path = custom_voice_tts(response)
             else:
                 audio_path = text_to_speech(response, current_voice_type)
             
-            if audio_path:
-                return response, audio_path
-            else:
-                return response, None
+            return response, audio_path
         else:
             return response, None
 
@@ -355,23 +351,17 @@ if __name__ == "__main__":
             current_date = get_current_date()
             gr.Markdown(f"## 🎤 Voice Chat with Ibe Nwandu")
             gr.Markdown(f"**Today is {current_date}**")
-            gr.Markdown("Ask me about my background, experience, and skills. You can type your message or use voice input.")
+            gr.Markdown("Ask me about my background, experience, and skills. You can use voice input or type your message.")
             
-            # Voice controls in a cleaner layout
-            with gr.Row():
-                voice_toggle = gr.Checkbox(
-                    label="🔊 Enable Voice Responses", 
-                    value=True,
-                    info="Toggle text-to-speech for responses"
-                )
-                voice_type = gr.Dropdown(
-                    choices=["alloy", "echo", "fable", "onyx", "nova", "shimmer", "custom"],
-                    value="alloy",
-                    label="🎭 Voice Type",
-                    info="Choose the voice for responses (Custom = your own voice model)"
-                )
+            # Voice type selection (simplified to only two options)
+            voice_type = gr.Dropdown(
+                choices=["alloy", "custom"],
+                value="alloy",
+                label="🎭 Voice Type",
+                info="Choose the voice for responses (Custom = your own voice model)"
+            )
             
-            # Chat interface with cleaner layout
+            # Chat interface
             chatbot = gr.Chatbot(
                 label="Chat History",
                 height=350,
@@ -379,27 +369,27 @@ if __name__ == "__main__":
                 type="messages"
             )
             
-            # Combined input section - text and voice side by side
+            # Input section - voice and text
             with gr.Row():
-                msg = gr.Textbox(
-                    label="💬 Type your message",
-                    placeholder="Type here or use voice input...",
-                    lines=2,
-                    scale=3
-                )
                 voice_input = gr.Audio(
                     sources=["microphone"],
                     type="filepath",
                     label="🎤 Voice Input",
-                    scale=1
+                    scale=2
+                )
+                msg = gr.Textbox(
+                    label="💬 Optional text input",
+                    placeholder="Or type your message here...",
+                    lines=2,
+                    scale=2
                 )
             
-            # Action buttons in cleaner layout
+            # Action buttons
             with gr.Row():
                 chat_submit_btn = gr.Button("💬 Send Message", variant="primary", scale=2)
                 clear_btn = gr.Button("🗑️ Clear Chat", variant="secondary", scale=1)
             
-            # Audio output
+            # Audio output for response replay
             audio_output = gr.Audio(
                 label="🔊 Response Audio",
                 visible=True,
@@ -452,7 +442,7 @@ if __name__ == "__main__":
         )
 
         # Voice chat event handlers
-        def respond(message, history, voice_enabled, voice_type):
+        def respond(message, history, voice_type):
             if not message.strip():
                 return history, None, ""
             
@@ -469,8 +459,8 @@ if __name__ == "__main__":
                         assistant_msg = history[i + 1].get("content", "")
                         history_tuples.append((user_msg, assistant_msg))
             
-            # Get response with voice
-            response, audio_path = me.chat_with_voice(message, history_tuples, voice_enabled)
+            # Get response with automatic voice generation
+            response, audio_path = me.chat_with_voice(message, history_tuples)
             
             # Update history in Gradio messages format
             history.append({"role": "user", "content": message})
@@ -478,7 +468,7 @@ if __name__ == "__main__":
             
             return history, audio_path, ""  # Clear message box
 
-        def respond_to_voice(audio_file, history, voice_enabled, voice_type):
+        def respond_to_voice(audio_file, history, voice_type):
             if not audio_file:
                 return history, None, ""
             
@@ -500,8 +490,8 @@ if __name__ == "__main__":
                         assistant_msg = history[i + 1].get("content", "")
                         history_tuples.append((user_msg, assistant_msg))
             
-            # Get response
-            response, audio_path = me.chat_with_voice(transcribed_text, history_tuples, voice_enabled)
+            # Get response with automatic voice generation
+            response, audio_path = me.chat_with_voice(transcribed_text, history_tuples)
             
             # Update history in Gradio messages format
             history.append({"role": "user", "content": transcribed_text})
@@ -515,20 +505,20 @@ if __name__ == "__main__":
         # Connect event handlers
         chat_submit_btn.click(
             fn=respond,
-            inputs=[msg, chatbot, voice_toggle, voice_type],
+            inputs=[msg, chatbot, voice_type],
             outputs=[chatbot, audio_output, msg]
         )
         
         # Handle Enter key press in text input
         msg.submit(
             fn=respond,
-            inputs=[msg, chatbot, voice_toggle, voice_type],
+            inputs=[msg, chatbot, voice_type],
             outputs=[chatbot, audio_output, msg]
         )
         
         voice_input.change(
             fn=respond_to_voice,
-            inputs=[voice_input, chatbot, voice_toggle, voice_type],
+            inputs=[voice_input, chatbot, voice_type],
             outputs=[chatbot, audio_output, msg]
         )
         
