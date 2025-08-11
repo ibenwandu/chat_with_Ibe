@@ -143,7 +143,8 @@ def text_to_speech(text, voice="alloy"):
         with tempfile.NamedTemporaryFile(suffix='.mp3', delete=False) as temp_file:
             audio_path = temp_file.name
         
-        response.stream_to_file(audio_path)
+        # Use the streaming response method to fix deprecation warning
+        response.with_streaming_response.stream_to_file(audio_path)
         print(f"✓ OpenAI TTS ({voice}) successful: {audio_path}")
         return audio_path
     except Exception as e:
@@ -259,6 +260,16 @@ def custom_voice_tts(text):
     except Exception as e:
         print(f"✗ Error in ElevenLabs voice cloning: {e}")
         return text_to_speech(text, voice="nova")
+
+
+def nova_voice_tts(text):
+    """Convert text to speech using OpenAI's Nova voice"""
+    return text_to_speech(text, voice="nova")
+
+
+def echo_voice_tts(text):
+    """Convert text to speech using OpenAI's Echo voice"""
+    return text_to_speech(text, voice="echo")
 
 
 # Global variable to track current voice type
@@ -494,8 +505,12 @@ class Me:
             # Generate speech for the response using current voice type
             if current_voice_type == "custom":
                 audio_path = custom_voice_tts(response)
-            else:
-                audio_path = text_to_speech(response, current_voice_type)
+            elif current_voice_type == "nova":
+                audio_path = nova_voice_tts(response)
+            elif current_voice_type == "echo":
+                audio_path = echo_voice_tts(response)
+            else:  # default to alloy
+                audio_path = text_to_speech(response, "alloy")
             
             return response, audio_path
         else:
@@ -564,14 +579,14 @@ if __name__ == "__main__":
             # Updated voice type selection with better descriptions
             voice_type = gr.Dropdown(
                 choices=[
-                    ("Standard Voice (OpenAI Alloy)", "alloy"),
-                    ("Your Cloned Voice (ElevenLabs)", "custom"),
-                    ("Alternative Voice (OpenAI Nova)", "nova"),
-                    ("Professional Voice (OpenAI Echo)", "echo")
+                    ("🎤 Standard Voice (Alloy)", "alloy"),
+                    ("🎭 Your Cloned Voice (ElevenLabs)", "custom"),
+                    ("🌟 Alternative Voice (Nova)", "nova"),
+                    ("💼 Professional Voice (Echo)", "echo")
                 ],
                 value="alloy",
                 label="🎭 Voice Type",
-                info="Choose between standard AI voices or your personalized cloned voice using ElevenLabs"
+                info="Choose between different AI voices or your personalized cloned voice using ElevenLabs"
             )
             
             # Chat interface
