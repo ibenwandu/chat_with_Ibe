@@ -623,14 +623,20 @@ if __name__ == "__main__":
             
             with gr.Row():
                 audio_output = gr.Audio(
-                    label="🎵 Play Response",
+                    label="🎵 Response Audio",
                     visible=True,
-                    interactive=False,
+                    interactive=True,
                     show_label=True,
                     container=True,
-                    scale=3
+                    scale=2
                 )
-                play_audio_btn = gr.Button("▶️ Play Audio", variant="primary", scale=1, visible=False)
+                play_audio_btn = gr.Button("▶️ Play Response", variant="primary", scale=1, visible=False)
+                audio_status = gr.Textbox(
+                    label="Status",
+                    value="No audio available",
+                    interactive=False,
+                    scale=1
+                )
 
         # Footer
         gr.HTML("""
@@ -680,7 +686,7 @@ if __name__ == "__main__":
         # Voice chat event handlers
         def respond(message, history, voice_type):
             if not message.strip():
-                return history, None, "", gr.update(visible=False)
+                return history, None, "", gr.update(visible=False), "No audio available"
             
             # Update voice type for TTS
             global current_voice_type
@@ -704,17 +710,18 @@ if __name__ == "__main__":
             
             # Show play button if audio was generated
             show_play_btn = gr.update(visible=audio_path is not None)
+            status_text = "Audio ready! Click to play." if audio_path else "No audio available"
             
-            return history, audio_path, "", show_play_btn  # Clear message box and show play button
+            return history, audio_path, "", show_play_btn, status_text  # Clear message box and show play button
 
         def respond_to_voice(audio_file, history, voice_type):
             if not audio_file:
-                return history, None, "", gr.update(visible=False)
+                return history, None, "", gr.update(visible=False), "No audio available"
             
             # Convert speech to text
             transcribed_text = speech_to_text(audio_file)
             if not transcribed_text:
-                return history, None, "Could not transcribe audio. Please try again.", gr.update(visible=False)
+                return history, None, "Could not transcribe audio. Please try again.", gr.update(visible=False), "Transcription failed"
             
             # Update voice type for TTS
             global current_voice_type
@@ -738,35 +745,46 @@ if __name__ == "__main__":
             
             # Show play button if audio was generated
             show_play_btn = gr.update(visible=audio_path is not None)
+            status_text = "Audio ready! Click to play." if audio_path else "No audio available"
             
-            return history, audio_path, "", show_play_btn
+            return history, audio_path, "", show_play_btn, status_text
 
         def clear_chat():
-            return [], None, gr.update(visible=False)
+            return [], None, gr.update(visible=False), "No audio available"
+
+        def play_audio():
+            """Handle play button click"""
+            return "Playing audio..."
 
         # Connect event handlers
         chat_submit_btn.click(
             fn=respond,
             inputs=[msg, chatbot, voice_type],
-            outputs=[chatbot, audio_output, msg, play_audio_btn]
+            outputs=[chatbot, audio_output, msg, play_audio_btn, audio_status]
         )
         
         # Handle Enter key press in text input
         msg.submit(
             fn=respond,
             inputs=[msg, chatbot, voice_type],
-            outputs=[chatbot, audio_output, msg, play_audio_btn]
+            outputs=[chatbot, audio_output, msg, play_audio_btn, audio_status]
         )
         
         voice_input.change(
             fn=respond_to_voice,
             inputs=[voice_input, chatbot, voice_type],
-            outputs=[chatbot, audio_output, msg, play_audio_btn]
+            outputs=[chatbot, audio_output, msg, play_audio_btn, audio_status]
         )
         
         clear_btn.click(
             fn=clear_chat,
-            outputs=[chatbot, audio_output, play_audio_btn]
+            outputs=[chatbot, audio_output, play_audio_btn, audio_status]
+        )
+        
+        # Handle play button click
+        play_audio_btn.click(
+            fn=play_audio,
+            outputs=[audio_status]
         )
 
     # Launch app
