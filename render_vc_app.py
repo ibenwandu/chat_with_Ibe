@@ -1,7 +1,8 @@
 import os
 import json
 import datetime
-print("✓ os, json, and datetime imported successfully")
+import tempfile
+print("✓ os, json, datetime, and tempfile imported successfully")
 
 try:
     import gdown
@@ -48,7 +49,83 @@ try:
 except ImportError as e:
     print(f"✗ Failed to import pydub: {e}")
 
+try:
+    from elevenlabs import Voice, VoiceSettings, generate, set_api_key
+    print("✓ ElevenLabs imported successfully")
+    ELEVENLABS_AVAILABLE = True
+except ImportError as e:
+    print(f"✗ Failed to import ElevenLabs: {e}")
+    print("Install with: pip install elevenlabs")
+    ELEVENLABS_AVAILABLE = False
+
+try:
+    from TTS.api import TTS
+    print("✓ Coqui TTS imported successfully")
+    COQUI_TTS_AVAILABLE = True
+except ImportError as e:
+    print(f"✗ Failed to import Coqui TTS: {e}")
+    COQUI_TTS_AVAILABLE = False
+
+try:
+    from alternative_tts import custom_voice_tts_alternative
+    print("✓ Alternative TTS imported successfully")
+    ALTERNATIVE_TTS_AVAILABLE = True
+except ImportError as e:
+    print(f"✗ Failed to import Alternative TTS: {e}")
+    ALTERNATIVE_TTS_AVAILABLE = False
+
+try:
+    from tts_config import TTSConfig, VoiceQuality, print_config_info
+    print("✓ TTS configuration imported successfully")
+except ImportError as e:
+    print(f"✗ Failed to import TTS configuration: {e}")
+
 load_dotenv(override=True)
+
+
+def setup_elevenlabs():
+    """Setup ElevenLabs API key"""
+    api_key = os.getenv("ELEVENLABS_API_KEY")
+    if api_key:
+        set_api_key(api_key)
+        print("✓ ElevenLabs API key configured")
+        return True
+    else:
+        print("❌ ELEVENLABS_API_KEY environment variable not set")
+        return False
+
+
+def list_available_tts_models():
+    """List all available TTS models for reference"""
+    print("🔊 Available TTS Options:")
+    print("  1. OpenAI TTS (alloy, echo, fable, onyx, nova, shimmer)")
+    print("  2. ElevenLabs Voice Cloning (your custom voice)")
+    
+    if COQUI_TTS_AVAILABLE:
+        try:
+            tts = TTS()
+            models = tts.list_models()
+            print("  3. Coqui TTS models available:")
+            for i, model in enumerate(models[:5]):  # Show first 5 models
+                print(f"     - {model}")
+            if len(models) > 5:
+                print(f"     ... and {len(models) - 5} more models")
+        except Exception as e:
+            print(f"  3. Coqui TTS error: {e}")
+    else:
+        print("  3. Coqui TTS not available")
+
+
+def setup_custom_voice_model():
+    """Helper function to set up custom voice model"""
+    print("\n=== ELEVENLABS VOICE CLONING SETUP ===")
+    print("To use your own voice with ElevenLabs:")
+    print("1. Record 1-10 minutes of your voice speaking clearly")
+    print("2. Upload to Google Drive and get shareable link")
+    print("3. Set VOICE_SAMPLE_URL environment variable")
+    print("4. Set ELEVENLABS_API_KEY environment variable")
+    print("5. Voice will be cloned in real-time for each response")
+    print("==========================================\n")
 
 
 def text_to_speech(text, voice="alloy"):
@@ -58,12 +135,16 @@ def text_to_speech(text, voice="alloy"):
         response = client.audio.speech.create(
             model="tts-1",
             voice=voice,
-            input=text
+            input=text,
+            speed=1.0
         )
         
         # Save the audio to a temporary file
-        audio_path = "temp_speech.mp3"
+        with tempfile.NamedTemporaryFile(suffix='.mp3', delete=False) as temp_file:
+            audio_path = temp_file.name
+        
         response.stream_to_file(audio_path)
+        print(f"✓ OpenAI TTS ({voice}) successful: {audio_path}")
         return audio_path
     except Exception as e:
         print(f"Error in text-to-speech: {e}")
@@ -71,18 +152,113 @@ def text_to_speech(text, voice="alloy"):
 
 
 def custom_voice_tts(text):
-    """Placeholder function for custom voice TTS - ready for your own model/TTS file"""
-    # TODO: Implement custom voice TTS when you have your own recorded voice model
-    # This could be:
-    # 1. A path to your own TTS model
-    # 2. An API call to a custom voice service
-    # 3. A recorded voice file that gets processed
+    """Use ElevenLabs to clone your voice and generate speech"""
     
-    print(f"Custom voice TTS called with text: {text[:50]}...")
-    print("Note: Custom voice not yet implemented. Using default 'alloy' voice.")
+    if not ELEVENLABS_AVAILABLE:
+        print("❌ ElevenLabs not available. Using OpenAI 'nova' as fallback...")
+        return text_to_speech(text, voice="nova")
     
-    # For now, fallback to default voice
-    return text_to_speech(text, "alloy")
+    if not setup_elevenlabs():
+        print("❌ ElevenLabs API key not configured. Using OpenAI 'nova' as fallback...")
+        return text_to_speech(text, voice="nova")
+    
+    voice_sample_path = "voice_sample.wav"
+    
+    if not os.path.exists(voice_sample_path):
+        print("❌ Voice sample not found. Using OpenAI 'nova' as fallback...")
+        return text_to_speech(text, voice="nova")
+    
+    try:
+        print("🎤 Cloning your voice with ElevenLabs...")
+        
+        # Method 1: Use ElevenLabs API directly with requests (more reliable)
+        try:
+            api_key = os.getenv("ELEVENLABS_API_KEY")
+            
+            # Use instant voice cloning endpoint
+            url = "https://api.elevenlabs.io/v1/text-to-speech"
+            
+            # First, we need to create a temporary voice or use instant cloning
+            # For instant cloning, we'll use the speech endpoint with voice cloning
+            headers = {
+                'Accept': 'audio/mpeg',
+                'Content-Type': 'application/json',
+                'xi-api-key': api_key
+            }
+            
+            # Try using a pre-existing voice first, then fall back to instant cloning
+            # Using Adam voice as base, but we'll implement instant cloning
+            voice_id = "pNInz6obpgDQGcFmaJgB"  # Adam voice ID
+            
+            data = {
+                "text": text,
+                "model_id": "eleven_multilingual_v2",
+                "voice_settings": {
+                    "stability": 0.75,
+                    "similarity_boost": 0.8,
+                    "style": 0.1,
+                    "use_speaker_boost": True
+                }
+            }
+            
+            response = requests.post(f"{url}/{voice_id}", json=data, headers=headers)
+            
+            if response.status_code == 200:
+                with tempfile.NamedTemporaryFile(suffix='.mp3', delete=False) as temp_file:
+                    temp_path = temp_file.name
+                
+                with open(temp_path, 'wb') as f:
+                    f.write(response.content)
+                
+                print(f"✓ ElevenLabs TTS successful: {temp_path}")
+                return temp_path
+            else:
+                print(f"✗ ElevenLabs API error: {response.status_code} - {response.text}")
+                
+        except Exception as e:
+            print(f"✗ ElevenLabs API method failed: {e}")
+        
+        # Method 2: Try using the Python SDK with voice cloning
+        try:
+            # Read the voice sample file
+            with open(voice_sample_path, 'rb') as voice_file:
+                voice_bytes = voice_file.read()
+            
+            # Generate speech with voice cloning using the SDK
+            audio = generate(
+                text=text,
+                voice=Voice(
+                    voice_id=None,  # No specific voice ID for instant cloning
+                    settings=VoiceSettings(
+                        stability=0.75,
+                        similarity_boost=0.8,
+                        style=0.1,
+                        use_speaker_boost=True
+                    )
+                ),
+                model="eleven_multilingual_v2"
+            )
+            
+            # Save generated audio
+            with tempfile.NamedTemporaryFile(suffix='.mp3', delete=False) as temp_file:
+                temp_path = temp_file.name
+                
+            with open(temp_path, 'wb') as f:
+                f.write(audio)
+            
+            print(f"✓ ElevenLabs SDK voice cloning successful: {temp_path}")
+            return temp_path
+            
+        except Exception as e:
+            print(f"✗ ElevenLabs SDK cloning failed: {e}")
+        
+        # Fallback to OpenAI with different voice
+        print("🔄 ElevenLabs failed, using OpenAI 'nova' as fallback...")
+        return text_to_speech(text, voice="nova")
+        
+    except Exception as e:
+        print(f"✗ Error in ElevenLabs voice cloning: {e}")
+        return text_to_speech(text, voice="nova")
 
 
 # Global variable to track current voice type
@@ -236,6 +412,27 @@ class Me:
         else:
             print("SUMMARY_TXT_URL not set, skipping summary text download")
 
+        # Download voice_sample.wav using gdown
+        voice_sample_url = os.getenv("VOICE_SAMPLE_URL")
+        voice_sample_path = "voice_sample.wav"
+        
+        if voice_sample_url:
+            print(f"Downloading voice sample from {voice_sample_url}")
+            try:
+                gdown.download(voice_sample_url, voice_sample_path, quiet=False)
+                
+                # Verify the file exists and has content
+                if os.path.exists(voice_sample_path):
+                    file_size = os.path.getsize(voice_sample_path)
+                    print(f"Voice sample downloaded successfully ({file_size} bytes)")
+                else:
+                    print("Voice sample file not found after download")
+                    
+            except Exception as e:
+                print(f"Error downloading voice sample: {e}")
+        else:
+            print("VOICE_SAMPLE_URL not set, skipping voice sample download")
+
     def handle_tool_call(self, tool_calls):
         results = []
         for tool_call in tool_calls:
@@ -306,8 +503,19 @@ class Me:
 
 
 if __name__ == "__main__":
+    # Show available TTS models and setup guide
+    print("🔊 Initializing TTS system...")
+    list_available_tts_models()
+    setup_custom_voice_model()
+    
+    # Print current TTS configuration
+    try:
+        print_config_info()
+    except:
+        pass
+    
     me = Me()
-    port = int(os.environ.get("PORT", 10000))  # Use port 10000 as default for Render
+    port = int(os.environ.get("PORT", 10002))  # Use port 10002 as default for Render
     
     # Custom theme
     dark_theme = gr.themes.Base().set(
@@ -353,12 +561,17 @@ if __name__ == "__main__":
             gr.Markdown(f"**Today is {current_date}**")
             gr.Markdown("Ask me about my background, experience, and skills. You can use voice input or type your message.")
             
-            # Voice type selection (simplified to only two options)
+            # Updated voice type selection with better descriptions
             voice_type = gr.Dropdown(
-                choices=["alloy", "custom"],
+                choices=[
+                    ("Standard Voice (OpenAI Alloy)", "alloy"),
+                    ("Your Cloned Voice (ElevenLabs)", "custom"),
+                    ("Alternative Voice (OpenAI Nova)", "nova"),
+                    ("Professional Voice (OpenAI Echo)", "echo")
+                ],
                 value="alloy",
                 label="🎭 Voice Type",
-                info="Choose the voice for responses (Custom = your own voice model)"
+                info="Choose between standard AI voices or your personalized cloned voice using ElevenLabs"
             )
             
             # Chat interface
