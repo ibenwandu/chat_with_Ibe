@@ -309,139 +309,133 @@ if __name__ == "__main__":
     me = Me()
     port = int(os.environ.get("PORT", 10000))  # Use port 10000 as default for Render
     
-    # Custom theme
-    dark_theme = gr.themes.Base().set(
-        body_background_fill="#2778c4",
-        body_text_color="#000000"
-    )
+    # Custom CSS for simple, clean UI
+    custom_css = """
+    <style>
+        /* Hide Gradio branding */
+        footer, 
+        .prose a[href*="gradio.app"], 
+        .gradio-container .footer {
+            display: none !important;
+        }
+        
+        /* Simple, clean styling */
+        .gradio-container {
+            max-width: 800px !important;
+            margin: 0 auto !important;
+        }
+        
+        /* Chat history styling */
+        .chat-history {
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+            min-height: 300px;
+            max-height: 500px;
+            overflow-y: auto;
+        }
+        
+        /* Input container styling */
+        .input-container {
+            display: flex;
+            align-items: center;
+            background: white;
+            border: 1px solid #e0e0e0;
+            border-radius: 25px;
+            padding: 8px 16px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        
+        /* Text input styling */
+        .text-input {
+            flex: 1;
+            border: none;
+            outline: none;
+            padding: 8px 12px;
+            font-size: 16px;
+            background: transparent;
+        }
+        
+        /* Icon button styling */
+        .icon-btn {
+            background: none;
+            border: none;
+            padding: 8px;
+            margin-left: 8px;
+            cursor: pointer;
+            border-radius: 50%;
+            transition: background-color 0.2s;
+        }
+        
+        .icon-btn:hover {
+            background-color: #f0f0f0;
+        }
+        
+        /* Voice type selector */
+        .voice-selector {
+            margin-bottom: 20px;
+            text-align: center;
+        }
+    </style>
+    """
 
-    with gr.Blocks(theme=dark_theme) as demo:
-        gr.HTML("""
-            <style>
-                footer, 
-                .prose a[href*="gradio.app"], 
-                .gradio-container .footer {
-                    display: none !important;
-                }
-            </style>
-            """)
-
-        # Password section - always visible initially
-        with gr.Column(visible=True) as password_section:
-            gr.Markdown("# Welcome")
-            error_message = gr.Textbox(
-                value="", 
-                visible=False, 
-                interactive=False, 
-                show_label=False,
-                container=False
-            )
-            password_box = gr.Textbox(
-                label="🔑 Enter Access Code", 
-                type="password",
-                placeholder="Enter password to access chatbot"
-            )
-            with gr.Row():
-                submit_btn = gr.Button("Submit", variant="primary")
-                show_password_btn = gr.Button("👁️ Show", variant="secondary")
-
-        # Container for chatbot that starts hidden
-        with gr.Column(visible=False) as chatbot_section:
-            # Dynamic greeting with today's date
-            current_date = get_current_date()
-            gr.Markdown(f"## 🎤 Voice Chat with Ibe Nwandu")
-            gr.Markdown(f"**Today is {current_date}**")
-            gr.Markdown("Ask me about my background, experience, and skills. You can use voice input or type your message.")
-            
-            # Voice type selection (simplified to only two options)
+    with gr.Blocks(css=custom_css) as demo:
+        gr.HTML(custom_css)
+        
+        # Header
+        gr.Markdown("# Chat with Ibe Nwandu")
+        gr.Markdown(f"*Today is {get_current_date()}*")
+        
+        # Voice type selector
+        with gr.Row():
             voice_type = gr.Dropdown(
                 choices=["alloy", "custom"],
                 value="alloy",
-                label="🎭 Voice Type",
-                info="Choose the voice for responses (Custom = your own voice model)"
+                label="Voice Type",
+                container=False,
+                scale=1
             )
-            
-            # Chat interface
-            chatbot = gr.Chatbot(
-                label="Chat History",
-                height=350,
-                show_label=True,
-                type="messages"
-            )
-            
-            # Input section - voice and text
-            with gr.Row():
+        
+        # Chat history
+        chatbot = gr.Chatbot(
+            label="",
+            height=400,
+            show_label=False,
+            container=False,
+            elem_classes=["chat-history"]
+        )
+        
+        # Simple input interface
+        with gr.Row():
+            with gr.Column(scale=4):
+                msg = gr.Textbox(
+                    label="",
+                    placeholder="Type your message here...",
+                    lines=1,
+                    show_label=False,
+                    container=False,
+                    elem_classes=["text-input"]
+                )
+            with gr.Column(scale=1):
                 voice_input = gr.Audio(
                     sources=["microphone"],
                     type="filepath",
-                    label="🎤 Voice Input",
-                    scale=2
+                    label="",
+                    show_label=False,
+                    container=False
                 )
-                msg = gr.Textbox(
-                    label="💬 Optional text input",
-                    placeholder="Or type your message here...",
-                    lines=2,
-                    scale=2
-                )
-            
-            # Action buttons
-            with gr.Row():
-                chat_submit_btn = gr.Button("💬 Send Message", variant="primary", scale=2)
-                clear_btn = gr.Button("🗑️ Clear Chat", variant="secondary", scale=1)
-            
-            # Audio output for response replay
-            audio_output = gr.Audio(
-                label="🔊 Response Audio",
-                visible=True,
-                interactive=False
-            )
-
-        # Footer
-        gr.HTML("""
-        <div style='text-align:center; color:red; padding:1em; font-size:1.2em; font-style:italic;'>
-            Ibe Nwandu
-        </div>
-        """)
-
-        # Show/hide password toggle
-        password_visible = gr.State(False)
+            with gr.Column(scale=1):
+                send_btn = gr.Button("Send", variant="primary", size="sm")
         
-        def toggle_password_visibility(is_visible):
-            new_visible = not is_visible
-            if new_visible:
-                return gr.update(type="text"), "🙈 Hide", new_visible
-            else:
-                return gr.update(type="password"), "👁️ Show", new_visible
-
-        # Button logic
-        def handle_password_submit(pw):
-            PASSWORD = os.getenv("CHATBOT_PASSCODE")
-            if pw == PASSWORD:
-                return (
-                    gr.update(visible=False),  # Hide password section completely
-                    gr.update(visible=True),   # Show chatbot section
-                    gr.update(value="", visible=False)  # Clear and hide error
-                )
-            else:
-                return (
-                    gr.update(visible=True),   # Keep password section visible
-                    gr.update(visible=False),  # Keep chatbot hidden
-                    gr.update(value="❌ Wrong password. Try again.", visible=True)  # Show error
-                )
-
-        submit_btn.click(
-            fn=handle_password_submit,
-            inputs=password_box,
-            outputs=[password_section, chatbot_section, error_message]
-        )
-        
-        show_password_btn.click(
-            fn=toggle_password_visibility,
-            inputs=password_visible,
-            outputs=[password_box, show_password_btn, password_visible]
+        # Audio output (hidden but functional)
+        audio_output = gr.Audio(
+            label="",
+            visible=False,
+            interactive=False
         )
 
-        # Voice chat event handlers
+        # Event handlers
         def respond(message, history, voice_type):
             if not message.strip():
                 return history, None, ""
@@ -499,11 +493,8 @@ if __name__ == "__main__":
             
             return history, audio_path, ""
 
-        def clear_chat():
-            return [], None
-
         # Connect event handlers
-        chat_submit_btn.click(
+        send_btn.click(
             fn=respond,
             inputs=[msg, chatbot, voice_type],
             outputs=[chatbot, audio_output, msg]
@@ -520,11 +511,6 @@ if __name__ == "__main__":
             fn=respond_to_voice,
             inputs=[voice_input, chatbot, voice_type],
             outputs=[chatbot, audio_output, msg]
-        )
-        
-        clear_btn.click(
-            fn=clear_chat,
-            outputs=[chatbot, audio_output]
         )
 
     # Launch app
