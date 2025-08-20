@@ -402,8 +402,7 @@ if __name__ == "__main__":
             label="",
             height=400,
             show_label=False,
-            container=False,
-            elem_classes=["chat-history"]
+            container=False
         )
         
         # Simple input interface
@@ -414,8 +413,7 @@ if __name__ == "__main__":
                     placeholder="Type your message here...",
                     lines=1,
                     show_label=False,
-                    container=False,
-                    elem_classes=["text-input"]
+                    container=False
                 )
             with gr.Column(scale=1):
                 voice_input = gr.Audio(
@@ -437,7 +435,7 @@ if __name__ == "__main__":
 
         # Event handlers
         def respond(message, history, voice_type):
-            if not message.strip():
+            if not message or not message.strip():
                 return history, None, ""
             
             # Update voice type for TTS
