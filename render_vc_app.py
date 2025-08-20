@@ -71,17 +71,9 @@ def text_to_speech(text, voice="alloy"):
 
 
 def custom_voice_tts(text):
-    """Placeholder function for custom voice TTS - ready for your own model/TTS file"""
-    # TODO: Implement custom voice TTS when you have your own recorded voice model
-    # This could be:
-    # 1. A path to your own TTS model
-    # 2. An API call to a custom voice service
-    # 3. A recorded voice file that gets processed
-    
+    """Placeholder function for custom voice TTS"""
     print(f"Custom voice TTS called with text: {text[:50]}...")
     print("Note: Custom voice not yet implemented. Using default 'alloy' voice.")
-    
-    # For now, fallback to default voice
     return text_to_speech(text, "alloy")
 
 
@@ -307,142 +299,181 @@ class Me:
 
 if __name__ == "__main__":
     me = Me()
-    port = int(os.environ.get("PORT", 10000))  # Use port 10000 as default for Render
+    port = int(os.environ.get("PORT", 10000))
     
-    # Custom CSS for simple, clean UI
+    # Custom CSS for minimal design matching the screenshot
     custom_css = """
-    <style>
-        /* Hide Gradio branding */
-        footer, 
-        .prose a[href*="gradio.app"], 
-        .gradio-container .footer {
-            display: none !important;
-        }
-        
-        /* Simple, clean styling */
-        .gradio-container {
-            max-width: 800px !important;
-            margin: 0 auto !important;
-        }
-        
-        /* Chat history styling */
-        .chat-history {
-            background: #f8f9fa;
-            border-radius: 12px;
-            padding: 20px;
-            margin-bottom: 20px;
-            min-height: 300px;
-            max-height: 500px;
-            overflow-y: auto;
-        }
-        
-        /* Input container styling */
-        .input-container {
-            display: flex;
-            align-items: center;
-            background: white;
-            border: 1px solid #e0e0e0;
-            border-radius: 25px;
-            padding: 8px 16px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-        }
-        
-        /* Text input styling */
-        .text-input {
-            flex: 1;
-            border: none;
-            outline: none;
-            padding: 8px 12px;
-            font-size: 16px;
-            background: transparent;
-        }
-        
-        /* Icon button styling */
-        .icon-btn {
-            background: none;
-            border: none;
-            padding: 8px;
-            margin-left: 8px;
-            cursor: pointer;
-            border-radius: 50%;
-            transition: background-color 0.2s;
-        }
-        
-        .icon-btn:hover {
-            background-color: #f0f0f0;
-        }
-        
-        /* Voice type selector */
-        .voice-selector {
-            margin-bottom: 20px;
-            text-align: center;
-        }
-    </style>
+    /* Hide Gradio footer and branding */
+    footer, 
+    .prose a[href*="gradio.app"], 
+    .gradio-container .footer {
+        display: none !important;
+    }
+    
+    /* Clean, minimal styling */
+    .gradio-container {
+        max-width: 800px !important;
+        margin: 0 auto;
+        background: white;
+    }
+    
+    /* Hide labels and make it cleaner */
+    .audio-container label,
+    .textbox-container label {
+        display: none !important;
+    }
+    
+    /* Style the input area to match screenshot */
+    .input-container {
+        border: 1px solid #e0e0e0;
+        border-radius: 25px;
+        padding: 8px 16px;
+        background: white;
+        margin: 20px 0;
+    }
+    
+    /* Hide unnecessary elements */
+    .chatbot .message-wrap {
+        display: none;
+    }
+    
+    /* Center the interface */
+    .main-container {
+        text-align: center;
+        padding: 40px 20px;
+    }
+    
+    /* Style buttons to be more minimal */
+    .gr-button {
+        border-radius: 20px;
+        border: 1px solid #ddd;
+        background: white;
+        padding: 8px 16px;
+    }
+    
+    /* Audio controls styling */
+    .audio-controls {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 10px;
+        margin: 20px 0;
+    }
     """
 
-    with gr.Blocks(css=custom_css) as demo:
-        gr.HTML(custom_css)
-        
-        # Header
-        gr.Markdown("# Chat with Ibe Nwandu")
-        gr.Markdown(f"*Today is {get_current_date()}*")
-        
-        # Voice type selector
-        with gr.Row():
-            voice_type = gr.Dropdown(
-                choices=["alloy", "custom"],
-                value="alloy",
-                label="Voice Type",
-                container=False,
-                scale=1
+    with gr.Blocks(css=custom_css, title="Voice Chat") as demo:
+        # Password section
+        with gr.Column(visible=True, elem_classes=["main-container"]) as password_section:
+            gr.Markdown("# Welcome")
+            error_message = gr.Textbox(
+                value="", 
+                visible=False, 
+                interactive=False, 
+                show_label=False,
+                container=False
             )
-        
-        # Chat history
-        chatbot = gr.Chatbot(
-            label="",
-            height=400,
-            show_label=False,
-            container=False
-        )
-        
-        # Simple input interface
-        with gr.Row():
-            with gr.Column(scale=4):
-                msg = gr.Textbox(
-                    label="",
-                    placeholder="Type your message here...",
-                    lines=1,
-                    show_label=False,
-                    container=False
-                )
-            with gr.Column(scale=1):
+            password_box = gr.Textbox(
+                label="🔒 Enter Access Code", 
+                type="password",
+                placeholder="Enter password to access chatbot",
+                elem_classes=["input-container"]
+            )
+            with gr.Row():
+                submit_btn = gr.Button("Submit", variant="primary")
+                show_password_btn = gr.Button("👁️ Show", variant="secondary")
+
+        # Simple chatbot interface matching the screenshot
+        with gr.Column(visible=False, elem_classes=["main-container"]) as chatbot_section:
+            # Minimal header
+            gr.Markdown("## Voice Assistant")
+            
+            # Hidden chatbot for conversation history (not displayed)
+            chatbot = gr.Chatbot(
+                visible=False,
+                show_label=False
+            )
+            
+            # Main input area - microphone and text input in a clean row
+            with gr.Row(elem_classes=["input-container"]):
                 voice_input = gr.Audio(
                     sources=["microphone"],
                     type="filepath",
-                    label="",
                     show_label=False,
-                    container=False
+                    container=False,
+                    scale=1
                 )
-            with gr.Column(scale=1):
-                send_btn = gr.Button("Send", variant="primary", size="sm")
-        
-        # Audio output (hidden but functional)
-        audio_output = gr.Audio(
-            label="",
-            visible=False,
-            interactive=False
+                msg = gr.Textbox(
+                    show_label=False,
+                    placeholder="Ask me anything...",
+                    container=False,
+                    lines=1,
+                    scale=4
+                )
+                send_btn = gr.Button("Send", variant="primary", scale=1)
+            
+            # Audio output for responses
+            audio_output = gr.Audio(
+                label="Response",
+                visible=True,
+                interactive=False,
+                show_label=True
+            )
+            
+            # Response text display
+            response_text = gr.Textbox(
+                label="Response",
+                interactive=False,
+                lines=4,
+                visible=True
+            )
+            
+            # Clear button
+            clear_btn = gr.Button("Clear Conversation", variant="secondary")
+
+        # Password handling
+        def handle_password_submit(pw):
+            PASSWORD = os.getenv("CHATBOT_PASSCODE")
+            if pw == PASSWORD:
+                return (
+                    gr.update(visible=False),
+                    gr.update(visible=True),
+                    gr.update(value="", visible=False)
+                )
+            else:
+                return (
+                    gr.update(visible=True),
+                    gr.update(visible=False),
+                    gr.update(value="❌ Wrong password. Try again.", visible=True)
+                )
+
+        submit_btn.click(
+            fn=handle_password_submit,
+            inputs=password_box,
+            outputs=[password_section, chatbot_section, error_message]
         )
 
-        # Event handlers
-        def respond(message, history, voice_type):
-            if not message or not message.strip():
-                return history, None, ""
+        # Show/hide password
+        password_visible = gr.State(False)
+        
+        def toggle_password_visibility(is_visible):
+            new_visible = not is_visible
+            if new_visible:
+                return gr.update(type="text"), "🙈 Hide", new_visible
+            else:
+                return gr.update(type="password"), "👁️ Show", new_visible
+
+        show_password_btn.click(
+            fn=toggle_password_visibility,
+            inputs=password_visible,
+            outputs=[password_box, show_password_btn, password_visible]
+        )
+
+        # Chat functionality
+        def respond(message, history):
+            if not message.strip():
+                return history, "", "", ""
             
-            # Update voice type for TTS
-            global current_voice_type
-            current_voice_type = voice_type
-            
-            # Convert history from Gradio messages format to tuples for our chat function
+            # Convert history format
             history_tuples = []
             if history:
                 for i in range(0, len(history), 2):
@@ -451,29 +482,25 @@ if __name__ == "__main__":
                         assistant_msg = history[i + 1].get("content", "")
                         history_tuples.append((user_msg, assistant_msg))
             
-            # Get response with automatic voice generation
+            # Get response with voice
             response, audio_path = me.chat_with_voice(message, history_tuples)
             
-            # Update history in Gradio messages format
+            # Update history
             history.append({"role": "user", "content": message})
             history.append({"role": "assistant", "content": response})
             
-            return history, audio_path, ""  # Clear message box
+            return history, response, audio_path, ""
 
-        def respond_to_voice(audio_file, history, voice_type):
+        def respond_to_voice(audio_file, history):
             if not audio_file:
-                return history, None, ""
+                return history, "", None, ""
             
             # Convert speech to text
             transcribed_text = speech_to_text(audio_file)
             if not transcribed_text:
-                return history, None, "Could not transcribe audio. Please try again."
+                return history, "Could not transcribe audio. Please try again.", None, ""
             
-            # Update voice type for TTS
-            global current_voice_type
-            current_voice_type = voice_type
-            
-            # Convert history from Gradio messages format to tuples for our chat function
+            # Convert history format
             history_tuples = []
             if history:
                 for i in range(0, len(history), 2):
@@ -482,37 +509,43 @@ if __name__ == "__main__":
                         assistant_msg = history[i + 1].get("content", "")
                         history_tuples.append((user_msg, assistant_msg))
             
-            # Get response with automatic voice generation
+            # Get response with voice
             response, audio_path = me.chat_with_voice(transcribed_text, history_tuples)
             
-            # Update history in Gradio messages format
+            # Update history
             history.append({"role": "user", "content": transcribed_text})
             history.append({"role": "assistant", "content": response})
             
-            return history, audio_path, ""
+            return history, response, audio_path, ""
 
-        # Connect event handlers
+        def clear_chat():
+            return [], "", None
+
+        # Event handlers
         send_btn.click(
             fn=respond,
-            inputs=[msg, chatbot, voice_type],
-            outputs=[chatbot, audio_output, msg]
+            inputs=[msg, chatbot],
+            outputs=[chatbot, response_text, audio_output, msg]
         )
         
-        # Handle Enter key press in text input
         msg.submit(
             fn=respond,
-            inputs=[msg, chatbot, voice_type],
-            outputs=[chatbot, audio_output, msg]
+            inputs=[msg, chatbot],
+            outputs=[chatbot, response_text, audio_output, msg]
         )
         
         voice_input.change(
             fn=respond_to_voice,
-            inputs=[voice_input, chatbot, voice_type],
-            outputs=[chatbot, audio_output, msg]
+            inputs=[voice_input, chatbot],
+            outputs=[chatbot, response_text, audio_output, msg]
+        )
+        
+        clear_btn.click(
+            fn=clear_chat,
+            outputs=[chatbot, response_text, audio_output]
         )
 
     # Launch app
-    # Use 0.0.0.0 for Render deployment, 127.0.0.1 for local development
     server_name = "0.0.0.0" if os.environ.get("RENDER") else "127.0.0.1"
     demo.launch(
         server_name=server_name,
