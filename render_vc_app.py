@@ -63,7 +63,8 @@ def text_to_speech(text, voice="alloy"):
         
         # Save the audio to a temporary file
         audio_path = "temp_speech.mp3"
-        response.stream_to_file(audio_path)
+        with open(audio_path, "wb") as f:
+            f.write(response.content)
         return audio_path
     except Exception as e:
         print(f"Error in text-to-speech: {e}")
@@ -387,10 +388,11 @@ if __name__ == "__main__":
             # Minimal header
             gr.Markdown("## Voice Assistant")
             
-            # Hidden chatbot for conversation history (not displayed)
+            # Chatbot for conversation history using tuples format
             chatbot = gr.Chatbot(
-                visible=False,
-                show_label=False
+                visible=True,
+                show_label=False,
+                height=300
             )
             
             # Main input area - microphone and text input in a clean row
@@ -471,78 +473,58 @@ if __name__ == "__main__":
         # Chat functionality
         def respond(message, history):
             if not message.strip():
-                return history, "", "", ""
-            
-            # Convert history format
-            history_tuples = []
-            if history:
-                for i in range(0, len(history), 2):
-                    if i + 1 < len(history):
-                        user_msg = history[i].get("content", "")
-                        assistant_msg = history[i + 1].get("content", "")
-                        history_tuples.append((user_msg, assistant_msg))
+                return history, "", ""
             
             # Get response with voice
-            response, audio_path = me.chat_with_voice(message, history_tuples)
+            response, audio_path = me.chat_with_voice(message, history)
             
-            # Update history
-            history.append({"role": "user", "content": message})
-            history.append({"role": "assistant", "content": response})
+            # Update history in tuples format for Gradio
+            new_history = history + [(message, response)]
             
-            return history, response, audio_path, ""
+            return new_history, response, ""
 
         def respond_to_voice(audio_file, history):
             if not audio_file:
-                return history, "", None, ""
+                return history, "Could not process audio. Please try again.", ""
             
             # Convert speech to text
             transcribed_text = speech_to_text(audio_file)
             if not transcribed_text:
-                return history, "Could not transcribe audio. Please try again.", None, ""
-            
-            # Convert history format
-            history_tuples = []
-            if history:
-                for i in range(0, len(history), 2):
-                    if i + 1 < len(history):
-                        user_msg = history[i].get("content", "")
-                        assistant_msg = history[i + 1].get("content", "")
-                        history_tuples.append((user_msg, assistant_msg))
+                return history, "Could not transcribe audio. Please try again.", ""
             
             # Get response with voice
-            response, audio_path = me.chat_with_voice(transcribed_text, history_tuples)
+            response, audio_path = me.chat_with_voice(transcribed_text, history)
             
-            # Update history
-            history.append({"role": "user", "content": transcribed_text})
-            history.append({"role": "assistant", "content": response})
+            # Update history in tuples format for Gradio
+            new_history = history + [(f"🎤 {transcribed_text}", response)]
             
-            return history, response, audio_path, ""
+            return new_history, response, ""
 
         def clear_chat():
-            return [], "", None
+            return [], ""
 
         # Event handlers
         send_btn.click(
             fn=respond,
             inputs=[msg, chatbot],
-            outputs=[chatbot, response_text, audio_output, msg]
+            outputs=[chatbot, response_text, msg]
         )
         
         msg.submit(
             fn=respond,
             inputs=[msg, chatbot],
-            outputs=[chatbot, response_text, audio_output, msg]
+            outputs=[chatbot, response_text, msg]
         )
         
         voice_input.change(
             fn=respond_to_voice,
             inputs=[voice_input, chatbot],
-            outputs=[chatbot, response_text, audio_output, msg]
+            outputs=[chatbot, response_text, msg]
         )
         
         clear_btn.click(
             fn=clear_chat,
-            outputs=[chatbot, response_text, audio_output]
+            outputs=[chatbot, response_text]
         )
 
     # Launch app
