@@ -256,9 +256,6 @@ if __name__ == "__main__":
     me = Me()
     port = int(os.environ.get("PORT", 10000))
     
-    # Voice configuration
-    current_voice_type = "alloy"  # Can be "alloy", "echo", "fable", "onyx", "nova", "shimmer", or "custom"
-    
     # Custom CSS for minimal design matching the screenshot
     custom_css = """
     /* Hide Gradio footer and branding */
@@ -420,12 +417,12 @@ if __name__ == "__main__":
                     
                     gr.Markdown("*Speak your question and it will be automatically processed when recording stops*")
             
-            # Audio output for TTS responses (always visible but compact)
-            audio_output = gr.Audio(
-                label="🔊 Response Audio",
-                visible=True,
+            # Response text display
+            response_text = gr.Textbox(
+                label="Response",
                 interactive=False,
-                show_label=True
+                lines=4,
+                visible=True
             )
             
             # Clear button
@@ -492,78 +489,62 @@ if __name__ == "__main__":
             outputs=[text_mode, voice_mode_interface]
         )
 
-        # Chat functionality with TTS
+        # Chat functionality
         def respond(message, history):
             if not message.strip():
-                return history, "", None
+                return history, "", ""
             
             # Get response
             response = me.chat(message, history)
             
-            # Generate TTS audio for the response
-            audio_path = None
-            if response:
-                if current_voice_type == "custom":
-                    audio_path = custom_voice_tts(response)
-                else:
-                    audio_path = text_to_speech(response, current_voice_type)
-            
             # Update history in tuples format for Gradio
             new_history = history + [(message, response)]
             
-            return new_history, "", audio_path
+            return new_history, response, ""
 
         def respond_to_voice(audio_file, history):
             if not audio_file:
-                return history, gr.update(visible=True), gr.update(visible=False), None
+                return history, "Could not process audio. Please try again.", gr.update(visible=True), gr.update(visible=False)
             
             # Convert speech to text
             transcribed_text = speech_to_text(audio_file)
             if not transcribed_text:
-                return history, gr.update(visible=True), gr.update(visible=False), None
+                return history, "Could not transcribe audio. Please try again.", gr.update(visible=True), gr.update(visible=False)
             
             # Get response
             response = me.chat(transcribed_text, history)
-            
-            # Generate TTS audio for the response
-            audio_path = None
-            if response:
-                if current_voice_type == "custom":
-                    audio_path = custom_voice_tts(response)
-                else:
-                    audio_path = text_to_speech(response, current_voice_type)
             
             # Update history in tuples format for Gradio
             new_history = history + [(f"🎤 {transcribed_text}", response)]
             
             # Return to text mode after processing voice input
-            return new_history, gr.update(visible=True), gr.update(visible=False), audio_path
+            return new_history, response, gr.update(visible=True), gr.update(visible=False)
 
         def clear_chat():
-            return [], None
+            return [], ""
 
         # Event handlers
         send_btn.click(
             fn=respond,
             inputs=[msg, chatbot],
-            outputs=[chatbot, msg, audio_output]
+            outputs=[chatbot, response_text, msg]
         )
         
         msg.submit(
             fn=respond,
             inputs=[msg, chatbot],
-            outputs=[chatbot, msg, audio_output]
+            outputs=[chatbot, response_text, msg]
         )
         
         voice_input.change(
             fn=respond_to_voice,
             inputs=[voice_input, chatbot],
-            outputs=[chatbot, text_mode, voice_mode_interface, audio_output]
+            outputs=[chatbot, response_text, text_mode, voice_mode_interface]
         )
         
         clear_btn.click(
             fn=clear_chat,
-            outputs=[chatbot, audio_output]
+            outputs=[chatbot, response_text]
         )
 
     # Launch app
