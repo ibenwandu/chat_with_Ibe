@@ -491,6 +491,7 @@ if __name__ == "__main__":
 
         # Chat functionality with TTS
         def respond(message, history):
+            global current_voice_type
             if not message.strip():
                 return history, "", None
             
@@ -511,6 +512,7 @@ if __name__ == "__main__":
             return new_history, "", audio_path
 
         def respond_to_voice(audio_file, history):
+            global current_voice_type
             if not audio_file:
                 return history, gr.update(visible=True), gr.update(visible=False), None
             
