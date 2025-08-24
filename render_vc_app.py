@@ -51,37 +51,6 @@ except ImportError as e:
 load_dotenv(override=True)
 
 
-def text_to_speech(text, voice="alloy"):
-    """Convert text to speech using OpenAI's TTS API"""
-    try:
-        client = OpenAI()
-        response = client.audio.speech.create(
-            model="tts-1",
-            voice=voice,
-            input=text
-        )
-        
-        # Save the audio to a temporary file
-        audio_path = "temp_speech.mp3"
-        with open(audio_path, "wb") as f:
-            f.write(response.content)
-        return audio_path
-    except Exception as e:
-        print(f"Error in text-to-speech: {e}")
-        return None
-
-
-def custom_voice_tts(text):
-    """Placeholder function for custom voice TTS"""
-    print(f"Custom voice TTS called with text: {text[:50]}...")
-    print("Note: Custom voice not yet implemented. Using default 'alloy' voice.")
-    return text_to_speech(text, "alloy")
-
-
-# Global variable to track current voice type
-current_voice_type = "alloy"
-
-
 def speech_to_text(audio_file):
     """Convert speech to text using OpenAI's Whisper API"""
     try:
@@ -282,21 +251,6 @@ class Me:
                 done = True
         return response.choices[0].message.content
 
-    def chat_with_voice(self, message, history):
-        """Chat with automatic text-to-speech for responses"""
-        response = self.chat(message, history)
-        
-        if response:
-            # Generate speech for the response using current voice type
-            if current_voice_type == "custom":
-                audio_path = custom_voice_tts(response)
-            else:
-                audio_path = text_to_speech(response, current_voice_type)
-            
-            return response, audio_path
-        else:
-            return response, None
-
 
 if __name__ == "__main__":
     me = Me()
@@ -331,6 +285,32 @@ if __name__ == "__main__":
         padding: 8px 16px;
         background: white;
         margin: 20px 0;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    
+    /* Voice mode button styling */
+    .voice-mode-btn {
+        background: #f8f9fa;
+        border: 1px solid #e0e0e0;
+        border-radius: 20px;
+        padding: 8px 16px;
+        font-size: 14px;
+        color: #666;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+    
+    .voice-mode-btn:hover {
+        background: #e9ecef;
+        border-color: #adb5bd;
+    }
+    
+    .voice-mode-active {
+        background: #007bff !important;
+        color: white !important;
+        border-color: #007bff !important;
     }
     
     /* Hide unnecessary elements */
@@ -352,17 +332,16 @@ if __name__ == "__main__":
         padding: 8px 16px;
     }
     
-    /* Audio controls styling */
-    .audio-controls {
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        gap: 10px;
-        margin: 20px 0;
+    /* Hide audio input when not in voice mode */
+    .audio-hidden {
+        display: none !important;
     }
     """
 
     with gr.Blocks(css=custom_css, title="Voice Chat") as demo:
+        # State to track voice mode
+        voice_mode_active = gr.State(False)
+        
         # Password section
         with gr.Column(visible=True, elem_classes=["main-container"]) as password_section:
             gr.Markdown("# Welcome")
@@ -395,15 +374,17 @@ if __name__ == "__main__":
                 height=300
             )
             
-            # Main input area - microphone and text input in a clean row
+            # Main input area with voice mode button
             with gr.Row(elem_classes=["input-container"]):
-                voice_input = gr.Audio(
-                    sources=["microphone"],
-                    type="filepath",
-                    show_label=False,
-                    container=False,
+                # Voice mode toggle button
+                voice_mode_btn = gr.Button(
+                    "🎤 Use voice mode", 
+                    variant="secondary",
+                    elem_classes=["voice-mode-btn"],
                     scale=1
                 )
+                
+                # Text input (always visible)
                 msg = gr.Textbox(
                     show_label=False,
                     placeholder="Ask me anything...",
@@ -411,14 +392,18 @@ if __name__ == "__main__":
                     lines=1,
                     scale=4
                 )
+                
+                # Send button
                 send_btn = gr.Button("Send", variant="primary", scale=1)
             
-            # Audio output for responses
-            audio_output = gr.Audio(
-                label="Response",
-                visible=True,
-                interactive=False,
-                show_label=True
+            # Audio input (hidden by default, shown when voice mode is active)
+            voice_input = gr.Audio(
+                sources=["microphone"],
+                type="filepath",
+                show_label=False,
+                container=False,
+                visible=False,
+                elem_classes=["audio-hidden"]
             )
             
             # Response text display
@@ -470,13 +455,37 @@ if __name__ == "__main__":
             outputs=[password_box, show_password_btn, password_visible]
         )
 
+        # Voice mode toggle
+        def toggle_voice_mode(current_mode):
+            new_mode = not current_mode
+            if new_mode:
+                return (
+                    gr.update(value="🔇 Exit voice mode", elem_classes=["voice-mode-btn", "voice-mode-active"]),
+                    gr.update(visible=True),
+                    gr.update(placeholder="Voice mode active - use microphone or type..."),
+                    new_mode
+                )
+            else:
+                return (
+                    gr.update(value="🎤 Use voice mode", elem_classes=["voice-mode-btn"]),
+                    gr.update(visible=False),
+                    gr.update(placeholder="Ask me anything..."),
+                    new_mode
+                )
+
+        voice_mode_btn.click(
+            fn=toggle_voice_mode,
+            inputs=voice_mode_active,
+            outputs=[voice_mode_btn, voice_input, msg, voice_mode_active]
+        )
+
         # Chat functionality
         def respond(message, history):
             if not message.strip():
                 return history, "", ""
             
-            # Get response with voice
-            response, audio_path = me.chat_with_voice(message, history)
+            # Get response
+            response = me.chat(message, history)
             
             # Update history in tuples format for Gradio
             new_history = history + [(message, response)]
@@ -492,8 +501,8 @@ if __name__ == "__main__":
             if not transcribed_text:
                 return history, "Could not transcribe audio. Please try again.", ""
             
-            # Get response with voice
-            response, audio_path = me.chat_with_voice(transcribed_text, history)
+            # Get response
+            response = me.chat(transcribed_text, history)
             
             # Update history in tuples format for Gradio
             new_history = history + [(f"🎤 {transcribed_text}", response)]
