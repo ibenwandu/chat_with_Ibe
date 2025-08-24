@@ -256,6 +256,9 @@ if __name__ == "__main__":
     me = Me()
     port = int(os.environ.get("PORT", 10000))
     
+    # Voice configuration
+    current_voice_type = "alloy"  # Can be "alloy", "echo", "fable", "onyx", "nova", "shimmer", or "custom"
+    
     # Custom CSS for minimal design matching the screenshot
     custom_css = """
     /* Hide Gradio footer and branding */
@@ -491,7 +494,6 @@ if __name__ == "__main__":
 
         # Chat functionality with TTS
         def respond(message, history):
-            global current_voice_type
             if not message.strip():
                 return history, "", None
             
@@ -512,7 +514,6 @@ if __name__ == "__main__":
             return new_history, "", audio_path
 
         def respond_to_voice(audio_file, history):
-            global current_voice_type
             if not audio_file:
                 return history, gr.update(visible=True), gr.update(visible=False), None
             
